@@ -111,5 +111,71 @@ export const LoanModel = {
     } finally {
       client.release();
     }
+  },
+
+  async getTopBorrowers() {
+    const query = `
+      WITH member_loan_stats AS (
+        SELECT
+          m.id AS member_id,
+          m.full_name,
+          m.email,
+          m.member_type,
+          COUNT(l.id)::int AS total_loans,
+          MAX(l.loan_date) AS last_loan_date
+        FROM members m
+        JOIN loans l ON l.member_id = m.id
+        GROUP BY m.id, m.full_name, m.email, m.member_type
+      ),
+      member_favorite_books AS (
+        SELECT
+          x.member_id,
+          x.title,
+          x.times_borrowed
+        FROM (
+          SELECT
+            l.member_id,
+            b.title,
+            COUNT(*)::int AS times_borrowed,
+            ROW_NUMBER() OVER (
+              PARTITION BY l.member_id
+              ORDER BY COUNT(*) DESC, b.title ASC
+            ) AS row_num
+          FROM loans l
+          JOIN books b ON b.id = l.book_id
+          GROUP BY l.member_id, b.title
+        ) x
+        WHERE x.row_num = 1
+      )
+      SELECT
+        s.member_id,
+        s.full_name,
+        s.email,
+        s.member_type,
+        s.total_loans,
+        s.last_loan_date,
+        f.title AS favorite_book_title,
+        f.times_borrowed
+      FROM member_loan_stats s
+      LEFT JOIN member_favorite_books f
+        ON s.member_id = f.member_id
+      ORDER BY s.total_loans DESC, s.last_loan_date DESC, s.full_name ASC
+      LIMIT 3
+    `;
+
+    const result = await pool.query(query);
+
+    return result.rows.map((row) => ({
+      member_id: row.member_id,
+      full_name: row.full_name,
+      email: row.email,
+      member_type: row.member_type,
+      total_loans: row.total_loans,
+      last_loan_date: row.last_loan_date,
+      favorite_book: {
+        title: row.favorite_book_title,
+        times_borrowed: row.times_borrowed
+      }
+    }));
   }
 };
