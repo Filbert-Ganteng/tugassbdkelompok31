@@ -30,7 +30,12 @@ export const LoanModel = {
         VALUES ($1, $2, $3)
         RETURNING *
       `;
-      const result = await client.query(loanQuery, [book_id, member_id, due_date]);
+
+      const result = await client.query(loanQuery, [
+        book_id,
+        member_id,
+        due_date
+      ]);
 
       await client.query('COMMIT');
       return result.rows[0];
@@ -53,6 +58,7 @@ export const LoanModel = {
       JOIN members m ON l.member_id = m.id
       ORDER BY l.loan_date DESC
     `;
+
     const result = await pool.query(query);
     return result.rows;
   },
@@ -78,22 +84,26 @@ export const LoanModel = {
         throw new Error('Buku sudah dikembalikan sebelumnya.');
       }
 
-      const updateLoanQuery = `
+      const updatedLoanResult = await client.query(
+        `
         UPDATE loans
         SET status = 'RETURNED',
             return_date = CURRENT_TIMESTAMP
         WHERE id = $1
         RETURNING *
-      `;
-      const updatedLoanResult = await client.query(updateLoanQuery, [loanId]);
+        `,
+        [loanId]
+      );
 
-      const updateBookQuery = `
+      const updatedBookResult = await client.query(
+        `
         UPDATE books
         SET available_copies = available_copies + 1
         WHERE id = $1
         RETURNING *
-      `;
-      const updatedBookResult = await client.query(updateBookQuery, [loan.book_id]);
+        `,
+        [loan.book_id]
+      );
 
       if (updatedBookResult.rows.length === 0) {
         throw new Error('Gagal memperbarui stok buku.');
@@ -129,9 +139,9 @@ export const LoanModel = {
       ),
       member_favorite_books AS (
         SELECT
-          x.member_id,
-          x.title,
-          x.times_borrowed
+          data.member_id,
+          data.title,
+          data.times_borrowed
         FROM (
           SELECT
             l.member_id,
@@ -140,26 +150,26 @@ export const LoanModel = {
             ROW_NUMBER() OVER (
               PARTITION BY l.member_id
               ORDER BY COUNT(*) DESC, b.title ASC
-            ) AS row_num
+            ) AS row_number
           FROM loans l
           JOIN books b ON b.id = l.book_id
           GROUP BY l.member_id, b.title
-        ) x
-        WHERE x.row_num = 1
+        ) data
+        WHERE data.row_number = 1
       )
       SELECT
-        s.member_id,
-        s.full_name,
-        s.email,
-        s.member_type,
-        s.total_loans,
-        s.last_loan_date,
-        f.title AS favorite_book_title,
-        f.times_borrowed
-      FROM member_loan_stats s
-      LEFT JOIN member_favorite_books f
-        ON s.member_id = f.member_id
-      ORDER BY s.total_loans DESC, s.last_loan_date DESC, s.full_name ASC
+        stats.member_id,
+        stats.full_name,
+        stats.email,
+        stats.member_type,
+        stats.total_loans,
+        stats.last_loan_date,
+        fav.title AS favorite_book_title,
+        fav.times_borrowed
+      FROM member_loan_stats stats
+      LEFT JOIN member_favorite_books fav
+        ON stats.member_id = fav.member_id
+      ORDER BY stats.total_loans DESC, stats.last_loan_date DESC, stats.full_name ASC
       LIMIT 3
     `;
 
