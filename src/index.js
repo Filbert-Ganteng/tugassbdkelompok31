@@ -19,9 +19,12 @@ app.use('/api/authors', authorRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/reports', reportRoutes);
 
-app.get('/', (req, res) => res.send('Smart Library API is Running...'));
+app.get('/', (req, res) => {
+  res.send('Smart Library API is Running...');
+});
 
 const PORT = process.env.PORT || 3000;
+
 app.listen(PORT, () => {
   console.log(`🚀 Server running on http://localhost:${PORT}`);
 });
