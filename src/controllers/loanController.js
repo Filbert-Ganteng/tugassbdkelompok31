@@ -6,6 +6,7 @@ export const LoanController = {
 
     try {
       const loan = await LoanModel.createLoan(book_id, member_id, due_date);
+
       res.status(201).json({
         message: 'Peminjaman berhasil dicatat!',
         data: loan
@@ -41,6 +42,7 @@ export const LoanController = {
   async getTopBorrowers(req, res) {
     try {
       const topBorrowers = await LoanModel.getTopBorrowers();
+
       res.json({
         message: 'Top 3 peminjam buku berhasil diambil',
         data: topBorrowers
